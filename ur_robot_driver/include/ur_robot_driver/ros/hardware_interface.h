@@ -48,6 +48,9 @@
 #include <ur_controllers/speed_scaling_interface.h>
 #include <ur_controllers/scaled_joint_command_interface.h>
 
+#include <ur_robot_driver/Float64ArrayStamped.h>
+#include <realtime_tools/realtime_publisher.h>
+
 #include "ur_robot_driver/ur/ur_driver.h"
 #include <ur_robot_driver/ros/dashboard_client_ros.h>
 
@@ -228,6 +231,8 @@ protected:
   vector6d_t joint_positions_;
   vector6d_t joint_velocities_;
   vector6d_t joint_efforts_;
+  vector6d_t joint_target_q_;
+  vector6d_t joint_target_qd_;
   vector6d_t fts_measurements_;
   vector6d_t tcp_pose_;
   std::bitset<18> actual_dig_out_bits_;
@@ -258,6 +263,12 @@ protected:
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::ToolDataMsg>> tool_data_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_dashboard_msgs::RobotMode>> robot_mode_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_dashboard_msgs::SafetyMode>> safety_mode_pub_;
+
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>> target_q_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>> actual_q_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>> target_qd_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>> actual_qd_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>> command_pub_;
 
   ros::ServiceServer set_speed_slider_srv_;
   ros::ServiceServer set_io_srv_;

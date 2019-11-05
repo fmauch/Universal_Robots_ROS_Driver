@@ -22,6 +22,7 @@
 
   <build_depend>boost</build_depend>
   <build_depend>industrial_robot_status_interface</build_depend>
+  <build_depend>message_generation</build_depend>
 
   <depend>actionlib</depend>
   <depend>control_msgs</depend>
@@ -38,6 +39,7 @@
   <depend>ur_controllers</depend>
   <depend>ur_dashboard_msgs</depend>
   <depend>ur_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>std_srvs</depend>
 
   <exec_depend>controller_stopper</exec_depend>
@@ -50,6 +52,7 @@
   <exec_depend>ur_description</exec_depend>
   <exec_depend>ur_e_description</exec_depend>
   <exec_depend>velocity_controllers</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
 
   <export>
     <hardware_interface plugin="${prefix}/hardware_interface_plugin.xml" />

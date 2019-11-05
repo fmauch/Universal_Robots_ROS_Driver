@@ -1,6 +1,8 @@
 timestamp
 actual_q
 actual_qd
+target_q
+target_qd
 speed_scaling
 target_speed_fraction
 runtime_state

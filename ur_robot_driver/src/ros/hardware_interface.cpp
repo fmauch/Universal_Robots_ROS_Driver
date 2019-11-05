@@ -379,6 +379,12 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   ur_driver_->startRTDECommunication();
   ROS_INFO_STREAM_NAMED("hardware_interface", "Loaded ur_robot_driver hardware_interface");
 
+  target_q_pub_.reset(new realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>(root_nh, "target_q", 4));
+  actual_q_pub_.reset(new realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>(root_nh, "actual_q", 4));
+  target_qd_pub_.reset(new realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>(root_nh, "target_qd", 4));
+  actual_qd_pub_.reset(new realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>(root_nh, "actual_qd", 4));
+  command_pub_.reset(new realtime_tools::RealtimePublisher<ur_robot_driver::Float64ArrayStamped>(root_nh, "command_sent", 4));
+
   return true;
 }
 
@@ -453,6 +459,52 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     publishIOData();
     publishToolData();
 
+    if (actual_q_pub_)
+    {
+      if (actual_q_pub_->trylock())
+      {
+        actual_q_pub_->msg_.header.stamp = time;
+        actual_q_pub_->msg_.data.clear();
+        actual_q_pub_->msg_.data.insert(actual_q_pub_->msg_.data.end(), joint_positions_.begin(),
+                                        joint_positions_.end());
+        actual_q_pub_->unlockAndPublish();
+      }
+    }
+    if (actual_qd_pub_)
+    {
+      if (actual_qd_pub_->trylock())
+      {
+        actual_qd_pub_->msg_.header.stamp = time;
+        actual_qd_pub_->msg_.data.clear();
+        actual_qd_pub_->msg_.data.insert(actual_qd_pub_->msg_.data.end(), joint_velocities_.begin(),
+                                        joint_velocities_.end());
+        actual_qd_pub_->unlockAndPublish();
+      }
+    }
+
+    readData(data_pkg, "target_q", joint_target_q_);
+    if (target_q_pub_)
+    {
+      if (target_q_pub_->trylock())
+      {
+        target_q_pub_->msg_.header.stamp = time;
+        target_q_pub_->msg_.data.clear();
+        target_q_pub_->msg_.data.insert(target_q_pub_->msg_.data.end(), joint_target_q_.begin(), joint_target_q_.end());
+        target_q_pub_->unlockAndPublish();
+      }
+    }
+    readData(data_pkg, "target_qd", joint_target_qd_);
+    if (target_qd_pub_)
+    {
+      if (target_qd_pub_->trylock())
+      {
+        target_qd_pub_->msg_.header.stamp = time;
+        target_qd_pub_->msg_.data.clear();
+        target_qd_pub_->msg_.data.insert(target_qd_pub_->msg_.data.end(), joint_target_qd_.begin(), joint_target_qd_.end());
+        target_qd_pub_->unlockAndPublish();
+      }
+    }
+
     // Transform fts measurements to tool frame
     extractToolPose(time);
     transformForceTorque();
@@ -519,10 +571,32 @@ void HardwareInterface::write(const ros::Time& time, const ros::Duration& period
   {
     if (position_controller_running_)
     {
+      if (command_pub_)
+      {
+        if (command_pub_->trylock())
+        {
+          command_pub_->msg_.header.stamp = time;
+          command_pub_->msg_.data.clear();
+          command_pub_->msg_.data.insert(command_pub_->msg_.data.end(), joint_position_command_.begin(),
+                                         joint_position_command_.end());
+          command_pub_->unlockAndPublish();
+        }
+      }
       ur_driver_->writeJointCommand(joint_position_command_, comm::ControlMode::MODE_SERVOJ);
     }
     else if (velocity_controller_running_)
     {
+      if (command_pub_)
+      {
+        if (command_pub_->trylock())
+        {
+          command_pub_->msg_.header.stamp = time;
+          command_pub_->msg_.data.clear();
+          command_pub_->msg_.data.insert(command_pub_->msg_.data.end(), joint_velocity_command_.begin(),
+                                         joint_velocity_command_.end());
+          command_pub_->unlockAndPublish();
+        }
+      }
       ur_driver_->writeJointCommand(joint_velocity_command_, comm::ControlMode::MODE_SPEEDJ);
     }
     else

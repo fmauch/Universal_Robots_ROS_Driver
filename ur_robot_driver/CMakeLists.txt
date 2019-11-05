@@ -16,9 +16,11 @@ find_package(catkin REQUIRED
     geometry_msgs
     hardware_interface
     industrial_robot_status_interface
+    message_generation
     pluginlib
     roscpp
     sensor_msgs
+    std_msgs
     std_srvs
     tf
     tf2_geometry_msgs
@@ -29,6 +31,17 @@ find_package(catkin REQUIRED
     ur_msgs
 )
 find_package(Boost REQUIRED)
+
+add_message_files(
+  DIRECTORY msg
+  FILES
+  Float64Array.msg
+  Float64ArrayStamped.msg
+  )
+
+generate_messages(DEPENDENCIES
+  std_msgs
+  )
 
 catkin_package(
   INCLUDE_DIRS
@@ -41,9 +54,11 @@ catkin_package(
     controller_manager
     geometry_msgs
     hardware_interface
+    message_runtime
     pluginlib
     roscpp
     sensor_msgs
+    std_msgs
     tf
     tf2_geometry_msgs
     tf2_msgs
