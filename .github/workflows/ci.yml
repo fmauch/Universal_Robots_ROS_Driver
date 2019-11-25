@@ -3,9 +3,13 @@ on: [push]
 
 jobs:
   build:
-
-    name: Main
+    name: build_melodic
     runs-on: ubuntu-latest
+    env:
+      ROS_DISTRO: "melodic"
+      CATKIN_LINT: "true"
+      UPSTREAM_WORKSPACE: "file"
+      ROSINSTALL_FILENAME: ".ci.rosinstall"
     steps:
       - name: Checkout
         uses: actions/checkout@v1
