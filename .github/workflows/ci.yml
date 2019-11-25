@@ -1,0 +1,17 @@
+name: Industrial CI pipeline
+on: [push]
+
+jobs:
+  build:
+
+    name: Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Container
+        uses: docker://ros:melodic-ros-core
+        with:
+          entrypoint: /bin/bash
+          args: -c "env && pwd && ls && git clone --branch master --depth 1 https://github.com/ros-industrial/industrial_ci.git /ici && /ici/ci.sh IN_DOCKER=1"
+        id: melodic-job
