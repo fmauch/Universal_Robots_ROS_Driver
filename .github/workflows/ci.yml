@@ -7,7 +7,13 @@ jobs:
     strategy:
       matrix:
         env:
-          - {ROS_DISTRO: melodic, UP, UPSTREAM_WORKSPACE: file, ROSINSTALL_FILENAME: .ci.rosinstall}
+          - ROS_DISTRO: melodic,
+            UPSTREAM_WORKSPACE: .ci.rosinstall
+          - ROS_DISTRO: melodic
+            UPSTREAM_WORKSPACE: .ci.rosinstall
+            CLANG_FORMAT_CHECK: file
+            CLANG_FORMAT_VERSION: 6.0
+
     steps:
       - uses: actions/checkout@v1
       - uses: 'ipa-mdl/industrial_ci@github-action'
