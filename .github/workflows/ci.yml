@@ -3,19 +3,12 @@ on: [push]
 
 jobs:
   build:
-    name: build_melodic
     runs-on: ubuntu-latest
-    env:
-      ROS_DISTRO: "melodic"
-      CATKIN_LINT: "true"
-      UPSTREAM_WORKSPACE: "file"
-      ROSINSTALL_FILENAME: ".ci.rosinstall"
+    strategy:
+      matrix:
+        env:
+          - {ROS_DISTRO: melodic, UP, UPSTREAM_WORKSPACE: file, ROSINSTALL_FILENAME: .ci.rosinstall}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-      - name: Container
-        uses: docker://ros:melodic-ros-core
-        with:
-          entrypoint: /bin/bash
-          args: -c "env && pwd && ls && git clone --branch master --depth 1 https://github.com/ros-industrial/industrial_ci.git /ici && /ici/ci.sh IN_DOCKER=1"
-        id: melodic-job
+      - uses: actions/checkout@v1
+      - uses: 'ipa-mdl/industrial_ci@github-action'
+        env: ${{matrix.env}}
