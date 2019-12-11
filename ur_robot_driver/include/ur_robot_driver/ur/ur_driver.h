@@ -58,7 +58,7 @@ public:
    * \param calibration_checksum Expected checksum of calibration. Will be matched against the
    * calibration reported by the robot.
    * \param reverse_port #TODO
-   * \param script_sending_port #TODO
+   * \param script_sending_port The driver will offer an interface to receive the program's URScript on this port. If the robot cannot connect to this port, `External Control` will stop immediately.
    */
   UrDriver(const std::string& robot_ip, const std::string& script_file, const std::string& output_recipe_file,
            const std::string& input_recipe_file, std::function<void(bool)> handle_program_state, bool headless_mode,
