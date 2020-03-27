@@ -1,5 +1,5 @@
 name: Industrial CI pipeline
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
