@@ -27,6 +27,11 @@ speed_scaling_state_controller:
    type:         ur_controllers/SpeedScalingStateController
    publish_rate: *loop_hz
 
+twist_controller:
+   type:         cartesian_ros_controllers/TwistController
+   frame_id:     tool0_controller
+   publish_rate: *loop_hz
+
 # Joint Trajectory Controller - position based -------------------------------
 # For detailed explanations of parameter see http://wiki.ros.org/joint_trajectory_controller
 scaled_pos_traj_controller:

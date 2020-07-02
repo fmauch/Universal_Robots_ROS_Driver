@@ -11,6 +11,7 @@ endif()
 find_package(catkin REQUIRED
   COMPONENTS
     actionlib
+    cartesian_ros_control
     control_msgs
     controller_manager
     geometry_msgs
@@ -38,6 +39,7 @@ catkin_package(
     ur_robot_driver_plugin
   CATKIN_DEPENDS
     actionlib
+    cartesian_ros_control
     control_msgs
     controller_manager
     geometry_msgs

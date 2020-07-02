@@ -58,6 +58,7 @@ HardwareInterface::HardwareInterface()
   , runtime_state_(static_cast<uint32_t>(rtde_interface::RUNTIME_STATE::STOPPED))
   , position_controller_running_(false)
   , velocity_controller_running_(false)
+  , cartesian_controller_running_(false)
   , pausing_state_(PausingState::RUNNING)
   , pausing_ramp_up_increment_(0.01)
   , controllers_initialized_(false)
@@ -305,6 +306,13 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
         js_interface_.getHandle(joint_names_[i]), &joint_velocity_command_[i], &speed_scaling_combined_));
   }
 
+  cartesian_ros_control::CartesianStateHandle handle("base", "tool0_controller", &cart_pose_, &cart_twist_,
+                                                     &cart_accel_, &cart_jerk_);
+  cart_interface_.registerHandle(handle);
+  twist_interface_.registerHandle(
+      cartesian_ros_control::TwistCommandHandle(cart_interface_.getHandle("tool0_controller"), &twist_command_));
+  twist_interface_.getHandle("tool0_controller");
+
   speedsc_interface_.registerHandle(
       ur_controllers::SpeedScalingHandle("speed_scaling_factor", &speed_scaling_combined_));
 
@@ -323,6 +331,7 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   registerInterface(&speedsc_interface_);
   registerInterface(&fts_interface_);
   registerInterface(&robot_status_interface_);
+  registerInterface(&twist_interface_);
 
   tcp_pose_pub_.reset(new realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>(root_nh, "/tf", 100));
   io_pub_.reset(new realtime_tools::RealtimePublisher<ur_msgs::IOStates>(robot_hw_nh, "io_states", 1));
@@ -525,6 +534,18 @@ void HardwareInterface::write(const ros::Time& time, const ros::Duration& period
     {
       ur_driver_->writeJointCommand(joint_velocity_command_, comm::ControlMode::MODE_SPEEDJ);
     }
+    else if (cartesian_controller_running_)
+    {
+      // TODO: Quick and ugly proof of concept
+      vector6d_t cart_command;
+      cart_command[0] = twist_command_.linear.x;
+      cart_command[1] = twist_command_.linear.y;
+      cart_command[2] = twist_command_.linear.z;
+      cart_command[3] = twist_command_.angular.x;
+      cart_command[4] = twist_command_.angular.y;
+      cart_command[5] = twist_command_.angular.z;
+      ur_driver_->writeJointCommand(cart_command, comm::ControlMode::MODE_SPEEDL);
+    }
     else
     {
       ur_driver_->writeKeepalive();
@@ -566,19 +587,29 @@ void HardwareInterface::doSwitch(const std::list<hardware_interface::ControllerI
       {
         if (resource_it.hardware_interface == "ur_controllers::ScaledPositionJointInterface")
         {
+          ROS_INFO_STREAM("Stopping scaled pos traj controller");
           position_controller_running_ = false;
         }
-        if (resource_it.hardware_interface == "hardware_interface::PositionJointInterface")
+        else if (resource_it.hardware_interface == "hardware_interface::PositionJointInterface")
         {
           position_controller_running_ = false;
         }
-        if (resource_it.hardware_interface == "ur_controllers::ScaledVelocityJointInterface")
+        else if (resource_it.hardware_interface == "ur_controllers::ScaledVelocityJointInterface")
         {
           velocity_controller_running_ = false;
         }
-        if (resource_it.hardware_interface == "hardware_interface::VelocityJointInterface")
+        else if (resource_it.hardware_interface == "hardware_interface::VelocityJointInterface")
         {
           velocity_controller_running_ = false;
+        }
+        else if (resource_it.hardware_interface == "cartesian_ros_control::TwistCommandInterface")
+        {
+          ROS_INFO_STREAM("Stopping cartesian controller");
+          cartesian_controller_running_ = false;
+        }
+        else
+        {
+          ROS_INFO_STREAM("Stopping controller of hw type " << resource_it.hardware_interface);
         }
       }
     }
@@ -591,19 +622,29 @@ void HardwareInterface::doSwitch(const std::list<hardware_interface::ControllerI
       {
         if (resource_it.hardware_interface == "ur_controllers::ScaledPositionJointInterface")
         {
+          ROS_INFO_STREAM("Starting scaled pos traj controller");
           position_controller_running_ = true;
         }
-        if (resource_it.hardware_interface == "hardware_interface::PositionJointInterface")
+        else if (resource_it.hardware_interface == "hardware_interface::PositionJointInterface")
         {
           position_controller_running_ = true;
         }
-        if (resource_it.hardware_interface == "ur_controllers::ScaledVelocityJointInterface")
+        else if (resource_it.hardware_interface == "ur_controllers::ScaledVelocityJointInterface")
         {
           velocity_controller_running_ = true;
         }
-        if (resource_it.hardware_interface == "hardware_interface::VelocityJointInterface")
+        else if (resource_it.hardware_interface == "hardware_interface::VelocityJointInterface")
         {
           velocity_controller_running_ = true;
+        }
+        else if (resource_it.hardware_interface == "cartesian_ros_control::TwistCommandInterface")
+        {
+          ROS_INFO_STREAM("Starting cartesian controller");
+          cartesian_controller_running_ = true;
+        }
+        else
+        {
+          ROS_INFO_STREAM("Starting controller of hw type " << resource_it.hardware_interface);
         }
       }
     }
@@ -952,6 +993,13 @@ bool HardwareInterface::checkControllerClaims(const std::set<std::string>& claim
       {
         return true;
       }
+    }
+  }
+  for (const std::string& jt : claimed_resources)
+  {
+    if ("tool0_controller" == jt)
+    {
+      return true;
     }
   }
   return false;
