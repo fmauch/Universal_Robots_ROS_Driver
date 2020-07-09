@@ -30,6 +30,7 @@ speed_scaling_state_controller:
 twist_controller:
    type:         cartesian_ros_controllers/TwistController
    frame_id:     tool0_controller
+   joints:       *robot_joints
    publish_rate: *loop_hz
 
 # Joint Trajectory Controller - position based -------------------------------
