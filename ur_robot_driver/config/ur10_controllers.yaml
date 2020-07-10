@@ -33,6 +33,12 @@ twist_controller:
    joints:       *robot_joints
    publish_rate: *loop_hz
 
+pose_controller:
+   type:         cartesian_ros_controllers/PoseController
+   frame_id:     tool0_controller
+   joints:       *robot_joints
+   publish_rate: *loop_hz
+
 # Joint Trajectory Controller - position based -------------------------------
 # For detailed explanations of parameter see http://wiki.ros.org/joint_trajectory_controller
 scaled_pos_traj_controller:

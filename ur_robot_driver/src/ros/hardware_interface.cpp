@@ -28,6 +28,7 @@
 #include "ur_robot_driver/ros/hardware_interface.h"
 #include "ur_robot_driver/ur/tool_communication.h"
 #include <ur_robot_driver/exceptions.h>
+#include <tf/transform_datatypes.h>
 
 #include <Eigen/Geometry>
 
@@ -58,7 +59,8 @@ HardwareInterface::HardwareInterface()
   , runtime_state_(static_cast<uint32_t>(rtde_interface::RUNTIME_STATE::STOPPED))
   , position_controller_running_(false)
   , velocity_controller_running_(false)
-  , cartesian_controller_running_(false)
+  , twist_controller_running_(false)
+  , pose_controller_running_(false)
   , pausing_state_(PausingState::RUNNING)
   , pausing_ramp_up_increment_(0.01)
   , controllers_initialized_(false)
@@ -312,6 +314,9 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   twist_interface_.registerHandle(
       cartesian_ros_control::TwistCommandHandle(cart_interface_.getHandle("tool0_controller"), &twist_command_));
   twist_interface_.getHandle("tool0_controller");
+  pose_interface_.registerHandle(
+      cartesian_ros_control::PoseCommandHandle(cart_interface_.getHandle("tool0_controller"), &pose_command_));
+  pose_interface_.getHandle("tool0_controller");
 
   speedsc_interface_.registerHandle(
       ur_controllers::SpeedScalingHandle("speed_scaling_factor", &speed_scaling_combined_));
@@ -332,6 +337,7 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   registerInterface(&fts_interface_);
   registerInterface(&robot_status_interface_);
   registerInterface(&twist_interface_);
+  registerInterface(&pose_interface_);
 
   tcp_pose_pub_.reset(new realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>(root_nh, "/tf", 100));
   io_pub_.reset(new realtime_tools::RealtimePublisher<ur_msgs::IOStates>(robot_hw_nh, "io_states", 1));
@@ -457,6 +463,15 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     readBitsetData<uint32_t>(data_pkg, "analog_io_types", analog_io_types_);
     readBitsetData<uint32_t>(data_pkg, "tool_analog_input_types", tool_analog_input_types_);
 
+    cart_pose_.position.x = tcp_pose_[0];
+    cart_pose_.position.y = tcp_pose_[1];
+    cart_pose_.position.z = tcp_pose_[2];
+    tf::Quaternion q;
+    q.setRPY(tcp_pose_[3], tcp_pose_[4], tcp_pose_[5]);
+    tf::quaternionTFToMsg(q, cart_pose_.orientation);
+
+    //ROS_INFO_STREAM("Read " << cart_pose_);
+
     extractRobotStatus();
 
     publishIOData();
@@ -534,7 +549,7 @@ void HardwareInterface::write(const ros::Time& time, const ros::Duration& period
     {
       ur_driver_->writeJointCommand(joint_velocity_command_, comm::ControlMode::MODE_SPEEDJ);
     }
-    else if (cartesian_controller_running_)
+    else if (twist_controller_running_)
     {
       // TODO: Quick and ugly proof of concept
       vector6d_t cart_command;
@@ -545,6 +560,26 @@ void HardwareInterface::write(const ros::Time& time, const ros::Duration& period
       cart_command[4] = twist_command_.angular.y;
       cart_command[5] = twist_command_.angular.z;
       ur_driver_->writeJointCommand(cart_command, comm::ControlMode::MODE_SPEEDL);
+    }
+    else if (pose_controller_running_)
+    {
+      // TODO: Quick and ugly proof of concept
+      vector6d_t cart_command;
+      cart_command[0] = pose_command_.position.x;
+      cart_command[1] = pose_command_.position.y;
+      cart_command[2] = pose_command_.position.z;
+      // TODO: extract rpy
+      tf::Pose pose;
+      tf::poseMsgToTF(pose_command_, pose);
+      tf::Matrix3x3 m(pose.getRotation());
+      m.getRPY(cart_command[3], cart_command[4], cart_command[5]);
+
+      //cart_command = {0.0, 0.7, 0.7, 0, 0, 0};
+      if(pose.getRotation().getW() > 0.0)
+      {
+        ROS_INFO_STREAM("Sending " << cart_command);
+        ur_driver_->writeJointCommand(cart_command, comm::ControlMode::MODE_POSE);
+      }
     }
     else
     {
@@ -604,8 +639,13 @@ void HardwareInterface::doSwitch(const std::list<hardware_interface::ControllerI
         }
         else if (resource_it.hardware_interface == "cartesian_ros_control::TwistCommandInterface")
         {
-          ROS_INFO_STREAM("Stopping cartesian controller");
-          cartesian_controller_running_ = false;
+          ROS_INFO_STREAM("Stopping twist controller");
+          twist_controller_running_ = false;
+        }
+        else if (resource_it.hardware_interface == "cartesian_ros_control::PoseCommandInterface")
+        {
+          ROS_INFO_STREAM("Stopping pose controller");
+          pose_controller_running_ = false;
         }
         else
         {
@@ -639,8 +679,13 @@ void HardwareInterface::doSwitch(const std::list<hardware_interface::ControllerI
         }
         else if (resource_it.hardware_interface == "cartesian_ros_control::TwistCommandInterface")
         {
-          ROS_INFO_STREAM("Starting cartesian controller");
-          cartesian_controller_running_ = true;
+          ROS_INFO_STREAM("Starting twist controller");
+          twist_controller_running_ = true;
+        }
+        else if (resource_it.hardware_interface == "cartesian_ros_control::PoseCommandInterface")
+        {
+          ROS_INFO_STREAM("Starting pose controller");
+          pose_controller_running_ = true;
         }
         else
         {

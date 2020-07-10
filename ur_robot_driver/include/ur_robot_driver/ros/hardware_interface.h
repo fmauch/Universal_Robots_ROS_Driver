@@ -227,11 +227,13 @@ protected:
 
   cartesian_ros_control::CartesianStateInterface cart_interface_;
   cartesian_ros_control::TwistCommandInterface twist_interface_;
+  cartesian_ros_control::PoseCommandInterface pose_interface_;
   geometry_msgs::Pose cart_pose_;
   geometry_msgs::Twist cart_twist_;
   geometry_msgs::Accel cart_accel_;
   geometry_msgs::Accel cart_jerk_;
   geometry_msgs::Twist twist_command_;
+  geometry_msgs::Pose pose_command_;
 
   vector6d_t joint_position_command_;
   vector6d_t joint_velocity_command_;
@@ -280,7 +282,8 @@ protected:
   uint32_t runtime_state_;
   bool position_controller_running_;
   bool velocity_controller_running_;
-  bool cartesian_controller_running_;
+  bool twist_controller_running_;
+  bool pose_controller_running_;
 
   PausingState pausing_state_;
   double pausing_ramp_up_increment_;

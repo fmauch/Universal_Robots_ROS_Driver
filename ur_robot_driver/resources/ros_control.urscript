@@ -16,6 +16,7 @@ MODE_IDLE = 0
 MODE_SERVOJ = 1
 MODE_SPEEDJ = 2
 MODE_SPEEDL = 3
+MODE_POSE = 4
 
 #Global variables are also showed in the Teach pendants variable list
 global cmd_servo_state = SERVO_UNINITIALIZED
@@ -78,6 +79,49 @@ thread servoThread():
   stopj(4.0)
 end
 
+thread servoThreadP():
+  textmsg("Starting servo thread")
+  state = SERVO_IDLE
+  while control_mode == MODE_POSE:
+    enter_critical
+    q = cmd_servo_q
+    do_extrapolate = False
+    if (cmd_servo_state == SERVO_IDLE):
+      do_extrapolate = True
+    end
+    state = cmd_servo_state
+    if cmd_servo_state > SERVO_UNINITIALIZED:
+      cmd_servo_state = SERVO_IDLE
+    end
+
+    if do_extrapolate:
+      extrapolate_count = extrapolate_count + 1
+      if extrapolate_count > extrapolate_max_count:
+        extrapolate_max_count = extrapolate_count
+      end
+
+      q = extrapolate()
+      servoj(q, t=steptime, {{SERVO_J_REPLACE}})
+
+    elif state == SERVO_RUNNING:
+      extrapolate_count = 0
+      servoj(q, t=steptime, {{SERVO_J_REPLACE}})
+    else:
+      extrapolate_count = 0
+      sync()
+    end
+    exit_critical
+  end
+  textmsg("servo thread ended")
+  stopj(4.0)
+end
+
+def set_servo_pose(pose):
+  cmd_servo_state = SERVO_RUNNING
+  cmd_servo_q_last = cmd_servo_q
+  cmd_servo_q = get_inverse_kin(pose, cmd_servo_q)
+end
+
 # Helpers for speed control
 def set_speed(qd):
   cmd_servo_qd = qd
@@ -133,6 +177,8 @@ while keepalive > 0 and control_mode > MODE_STOPPED:
         thread_move = run speedThread()
       elif control_mode == MODE_SPEEDL:
         thread_move = run speedlThread()
+      elif control_mode == MODE_POSE:
+        thread_move = run servoThreadP()
       end
     end
     if control_mode == MODE_SERVOJ:
@@ -144,6 +190,9 @@ while keepalive > 0 and control_mode > MODE_STOPPED:
     elif control_mode == MODE_SPEEDL:
       twist = [params_mult[2] / MULT_jointstate, params_mult[3] / MULT_jointstate, params_mult[4] / MULT_jointstate, params_mult[5] / MULT_jointstate, params_mult[6] / MULT_jointstate, params_mult[7] / MULT_jointstate]
       set_speedl(twist)
+    elif control_mode == MODE_POSE:
+      pose = p[params_mult[2] / MULT_jointstate, params_mult[3] / MULT_jointstate, params_mult[4] / MULT_jointstate, params_mult[5] / MULT_jointstate, params_mult[6] / MULT_jointstate, params_mult[7] / MULT_jointstate]
+      set_servo_pose(pose)
     end
   else:
     keepalive = keepalive - 1
