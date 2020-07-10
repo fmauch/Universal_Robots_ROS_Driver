@@ -23,7 +23,7 @@ jobs:
             ROS_REPO: main
             DOCKER_RUN_OPTS: --network bridge
             BEFORE_INIT: 'apt-get update -qq && apt-get install -y iproute2 iputils-ping && ip addr && ping -c5 172.17.0.2'
-            IMMEDIATE_TEST_OUTPUT: true
+            NOT_TEST_BUILD: 1
           - ROS_DISTRO: melodic
             UPSTREAM_WORKSPACE: .ci.rosinstall
             ROS_REPO: main
