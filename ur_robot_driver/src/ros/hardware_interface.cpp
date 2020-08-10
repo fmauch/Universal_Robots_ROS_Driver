@@ -49,6 +49,8 @@ static const std::bitset<11> in_error_bitset_(1 << toUnderlying(UrRtdeSafetyStat
 HardwareInterface::HardwareInterface()
   : joint_position_command_({ 0, 0, 0, 0, 0, 0 })
   , joint_velocity_command_({ 0, 0, 0, 0, 0, 0 })
+  , cartesian_velocity_command_({ 0, 0, 0, 0, 0, 0 })
+  , cartesian_pose_command_({ 0, 0, 0, 0, 0, 0 })
   , joint_positions_{ { 0, 0, 0, 0, 0, 0 } }
   , joint_velocities_{ { 0, 0, 0, 0, 0, 0 } }
   , joint_efforts_{ { 0, 0, 0, 0, 0, 0 } }
@@ -551,35 +553,28 @@ void HardwareInterface::write(const ros::Time& time, const ros::Duration& period
     }
     else if (twist_controller_running_)
     {
-      // TODO: Quick and ugly proof of concept
-      vector6d_t cart_command;
-      cart_command[0] = twist_command_.linear.x;
-      cart_command[1] = twist_command_.linear.y;
-      cart_command[2] = twist_command_.linear.z;
-      cart_command[3] = twist_command_.angular.x;
-      cart_command[4] = twist_command_.angular.y;
-      cart_command[5] = twist_command_.angular.z;
-      ur_driver_->writeJointCommand(cart_command, comm::ControlMode::MODE_SPEEDL);
+      cartesian_velocity_command_[0] = twist_command_.linear.x;
+      cartesian_velocity_command_[1] = twist_command_.linear.y;
+      cartesian_velocity_command_[2] = twist_command_.linear.z;
+      cartesian_velocity_command_[3] = twist_command_.angular.x;
+      cartesian_velocity_command_[4] = twist_command_.angular.y;
+      cartesian_velocity_command_[5] = twist_command_.angular.z;
+      ur_driver_->writeJointCommand(cartesian_velocity_command_, comm::ControlMode::MODE_SPEEDL);
     }
     else if (pose_controller_running_)
     {
-      // TODO: Quick and ugly proof of concept
-      vector6d_t cart_command;
-      cart_command[0] = pose_command_.position.x;
-      cart_command[1] = pose_command_.position.y;
-      cart_command[2] = pose_command_.position.z;
-      // TODO: extract rpy
+      cartesian_pose_command_[0] = pose_command_.position.x;
+      cartesian_pose_command_[1] = pose_command_.position.y;
+      cartesian_pose_command_[2] = pose_command_.position.z;
+      // TODO: extract rpy in a real-time-ready fashion
+      // If we didn't use geometry_msgs as internal datatypes, we could get around this better.
+      // Maybe use tf types instead.
       tf::Pose pose;
       tf::poseMsgToTF(pose_command_, pose);
       tf::Matrix3x3 m(pose.getRotation());
-      m.getRPY(cart_command[3], cart_command[4], cart_command[5]);
+      m.getRPY(cartesian_pose_command_[3], cartesian_pose_command_[4], cartesian_pose_command_[5]);
 
-      //cart_command = {0.0, 0.7, 0.7, 0, 0, 0};
-      if(pose.getRotation().getW() > 0.0)
-      {
-        ROS_INFO_STREAM("Sending " << cart_command);
-        ur_driver_->writeJointCommand(cart_command, comm::ControlMode::MODE_POSE);
-      }
+      ur_driver_->writeJointCommand(cartesian_pose_command_, comm::ControlMode::MODE_POSE);
     }
     else
     {

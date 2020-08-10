@@ -237,6 +237,8 @@ protected:
 
   vector6d_t joint_position_command_;
   vector6d_t joint_velocity_command_;
+  vector6d_t cartesian_velocity_command_;
+  vector6d_t cartesian_pose_command_;
   vector6d_t joint_positions_;
   vector6d_t joint_velocities_;
   vector6d_t joint_efforts_;
