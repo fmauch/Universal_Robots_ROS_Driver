@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-FROM lsiobase/guacgui:latest
+FROM lsiobase/guacgui:d0cd1b8f-ls65
 
 # Set Version Information
 ARG BUILD_DATE="15/08/19"
