@@ -121,6 +121,13 @@ public:
     std::ofstream file(output_filename_);
     if (file.is_open())
     {
+      YAML::Emitter out;
+      out << *calibration_data_;
+      if (!out.good())
+      {
+        ROS_ERROR_STREAM("Emitter error: " << out.GetLastError() << "\n");
+      }
+      ROS_INFO_STREAM("Extracted calibration: \n" << out.c_str());
       file << *calibration_data_;
     }
     else
