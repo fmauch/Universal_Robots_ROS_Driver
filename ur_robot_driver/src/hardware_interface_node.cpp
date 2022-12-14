@@ -29,6 +29,7 @@
 #include <controller_manager/controller_manager.h>
 
 #include <csignal>
+#include <thread>
 #include <ur_robot_driver/hardware_interface.h>
 #include <ur_robot_driver/urcl_log_handler.h>
 
@@ -109,6 +110,23 @@ int main(int argc, char** argv)
     else
     {
       ROS_ERROR("Could not get maximum thread priority for main thread");
+    }
+  }
+  else
+  {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(1, &cpuset);
+    int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+      ROS_ERROR_STREAM("Error setting thread affinity to " << rc);
+    }
+    sched_param sch_params;
+    sch_params.sched_priority = 99;
+    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sch_params))
+    {
+      ROS_ERROR_STREAM("Failed to set thread scheduling : " << std::strerror(errno));
     }
   }
 
