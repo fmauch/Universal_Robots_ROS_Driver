@@ -71,8 +71,7 @@ bool hasRealtimeKernel()
   }
   else
   {
-    ROS_ERROR_STREAM("Could not read '/sys/kernel/realtime'. This probably is no standard ubuntu system. Scheduling "
-                     "might still be possible, but we cannot check for the kernel's realtime support and assume it does not..");
+    ROS_WARN_STREAM("Could not read '/sys/kernel/realtime'. Assuming no real-time kernel.");
     return false;
   }
   return has_realtime;
@@ -148,6 +147,7 @@ int main(int argc, char** argv)
   bool do_fifo_scheduling = nh_priv.param("do_fifo_scheduling", true);
   int cpu_affinity = nh_priv.param("cpu_affinity", -1);
   bool non_blocking_read = nh_priv.param("non_blocking_read", false);
+  std::string timings_output_path = nh_priv.param<std::string>("timings_output_path", "/tmp/timings.txt");
 
   bool has_realtime = hasRealtimeKernel();
   ROS_INFO_STREAM("This system has " << (has_realtime ? "a" : "no") << " real-time kernel");
@@ -167,7 +167,8 @@ int main(int argc, char** argv)
       ROS_ERROR("Could not get maximum thread priority for main thread");
     }
   }
-  else {
+  else
+  {
     ROS_INFO("No FIFO scheduling requested");
   }
 
@@ -197,45 +198,55 @@ int main(int argc, char** argv)
   stopwatch_now = std::chrono::high_resolution_clock::now();
   period.fromSec(std::chrono::duration_cast<std::chrono::duration<double>>(stopwatch_now - stopwatch_last).count());
   stopwatch_last = stopwatch_now;
+  double cycle_period_diff = 0;
 
   double expected_cycle_time = 1.0 / (static_cast<double>(g_hw_interface->getControlFrequency()));
 
-  const size_t MAX_CYCLES = 100000;
-  std::vector<ros::Duration> timings(MAX_CYCLES, ros::Duration());
+  // Benchmarking stuff
+  int benchmarking_sec = nh_priv.param("benchmarking_time_sec", 60);
+  const size_t MAX_CYCLES = benchmarking_sec * g_hw_interface->getControlFrequency();
+  ROS_INFO_STREAM("Running benchmarking for " << benchmarking_sec << " seconds (" << MAX_CYCLES << " cycles)");
+  const size_t SKIP_CYCLES = 1;  // We skip cycles at the beginning for benchmarking
+  std::vector<ros::Duration> timings(MAX_CYCLES - SKIP_CYCLES, ros::Duration());
   size_t cycles_done = 0;
+  std::chrono::duration sleep_period = std::chrono::duration<double, std::ratio<1>>(0);
+  auto stopwatch_done = stopwatch_now;
 
   // Run as fast as possible
   while (ros::ok() && cycles_done < MAX_CYCLES)
   {
+    stopwatch_now = std::chrono::high_resolution_clock::now();
+    period.fromSec(std::chrono::duration_cast<std::chrono::duration<double>>(stopwatch_now - stopwatch_last).count());
+    stopwatch_last = stopwatch_now;
     // Receive current state from robot
     g_hw_interface->read(timestamp, period);
 
     // Get current time and elapsed time since last read
     timestamp = ros::Time::now();
-    stopwatch_now = std::chrono::high_resolution_clock::now();
-    period.fromSec(std::chrono::duration_cast<std::chrono::duration<double>>(stopwatch_now - stopwatch_last).count());
-    stopwatch_last = stopwatch_now;
 
     cm.update(timestamp, period, g_hw_interface->shouldResetControllers());
 
     g_hw_interface->write(timestamp, period);
-    timings[cycles_done] = period;
-    auto diff = expected_cycle_time - period.toSec();
+    if (cycles_done >= SKIP_CYCLES)
+    {
+      timings[cycles_done - SKIP_CYCLES] = period;
+    }
+    stopwatch_done = std::chrono::high_resolution_clock::now();
+    cycle_period_diff =
+        expected_cycle_time -
+        std::chrono::duration_cast<std::chrono::duration<double>>(stopwatch_done - stopwatch_now).count();
     if (non_blocking_read)
     {
-      //std::cout << "period: " << period << std::endl;
-      std::chrono::duration sleep_period = std::chrono::duration<double, std::ratio<1>>(diff);
-      //std::cout << "sleeping for " << sleep_period.count() << " seconds." << std::endl;
+      sleep_period = std::chrono::duration<double, std::ratio<1>>(cycle_period_diff);
       std::this_thread::sleep_for(sleep_period);
-    }
-;
+    };
     cycles_done++;
   }
 
   spinner.stop();
   ROS_INFO_STREAM_NAMED("hardware_interface", "Shutting down.");
 
-  std::ofstream outFile("/tmp/timings.txt");
+  std::ofstream outFile(timings_output_path);
   // the important part
   for (const auto& e : timings)
     outFile << e.toNSec() << "\n";

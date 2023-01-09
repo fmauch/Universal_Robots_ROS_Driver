@@ -14,6 +14,7 @@
   <arg name="script_sender_port" default="50002" doc="The driver will offer an interface to receive the program's URScript on this port. If the robot cannot connect to this port, `External Control` will stop immediately."/>
   <arg name="trajectory_port" default="50003" doc="Port that will be opened by the driver to allow trajectory forwarding."/>
   <arg name="script_command_port" default="50004" doc="Port that will be opened by the driver to allow forwarding script commands to the robot."/>
+  <arg name="robot_description_file" default="$(find ur_description)/launch/load_ur5e.launch" doc="Robot description launch file."/>
   <arg name="kinematics_config" default="$(find ur_description)/config/ur5e/default_kinematics.yaml" doc="Kinematics config file used for calibration correction. This will be used to verify the robot's calibration is matching the robot_description. Pass the same config file that is passed to the robot_description."/>
   <arg name="tf_prefix" default="" doc="tf_prefix used for the robot."/>
   <arg name="controllers" default="joint_state_controller scaled_pos_joint_traj_controller force_torque_sensor_controller robot_status_controller"/>
@@ -36,6 +37,14 @@
   <arg name="do_fifo_scheduling" default="true"/>
   <arg name="cpu_affinity" default="1"/>
   <arg name="non_blocking_read" default="false"/>
+  <arg name="benchmarking_time_sec" default="60"/>
+
+  <include file="$(arg robot_description_file)">
+    <arg name="kinematics_params" value="$(arg kinematics_config)"/>
+  </include>
+
+  <!-- Convert joint states to /tf tranforms -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
   <!-- Load hardware interface -->
   <node name="ur_hardware_interface" pkg="ur_robot_driver" type="ur_robot_driver_benchmarking_node" output="screen" launch-prefix="$(arg launch_prefix)" required="$(arg ur_hardware_interface_node_required)">
@@ -64,6 +73,7 @@
     <param name="do_fifo_scheduling" value="$(arg do_fifo_scheduling)"/>
     <param name="cpu_affinity" value="$(arg cpu_affinity)"/>
     <param name="non_blocking_read" value="$(arg non_blocking_read)"/>
+    <param name="benchmarking_time_sec" value="$(arg benchmarking_time_sec)"/>
   </node>
 
   <!-- Starts socat to bridge the robot's tool communication interface to a local tty device -->
