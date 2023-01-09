@@ -98,6 +98,14 @@ add_executable(ur_robot_driver_node
 target_link_libraries(ur_robot_driver_node ${catkin_LIBRARIES} ur_client_library::urcl urcl_log_handler)
 add_dependencies(ur_robot_driver_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+add_executable(ur_robot_driver_benchmarking_node
+  src/dashboard_client_ros.cpp
+  src/hardware_interface.cpp
+  src/hardware_interface_benchmarking_node.cpp
+)
+target_link_libraries(ur_robot_driver_benchmarking_node ${catkin_LIBRARIES} ur_client_library::urcl urcl_log_handler)
+add_dependencies(ur_robot_driver_benchmarking_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 add_executable(dashboard_client
   src/dashboard_client_ros.cpp
   src/dashboard_client_node.cpp
@@ -119,7 +127,7 @@ if(CATKIN_ENABLE_TESTING)
 endif()
 
 
-install(TARGETS ur_robot_driver_plugin urcl_log_handler ur_robot_driver_node robot_state_helper dashboard_client
+install(TARGETS ur_robot_driver_plugin urcl_log_handler ur_robot_driver_node robot_state_helper dashboard_client ur_robot_driver_benchmarking_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

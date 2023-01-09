@@ -71,7 +71,8 @@ bool hasRealtimeKernel()
   }
   else
   {
-    ROS_ERROR_STREAM("Could not read '/sys/kernel/realtime'. This probably is no standard Linux system.");
+    ROS_ERROR_STREAM("Could not read '/sys/kernel/realtime'. This probably is no standard ubuntu system. Scheduling "
+                     "might still be possible, but we cannot check for the kernel's realtime support and assume it does not..");
     return false;
   }
   return has_realtime;
@@ -84,9 +85,9 @@ bool setFiFoScheduling(pthread_t& thread, const int priority)
   int ret = pthread_setschedparam(thread, SCHED_FIFO, &params);
   if (ret != 0)
   {
-    ROS_ERROR_STREAM("Unsuccessful in setting thread to FIFI scheduling with priority " << priority
-                                                                                        << ". Error code: " << ret);
-    return false;
+    ROS_ERROR_STREAM("Unsuccessful in setting thread to FIFO scheduling with priority " << priority << ". "
+                                                                                        << strerror(ret));
+    // TODO: Catch error code 1 (no permission) and print separate information
   }
   // Now verify the change in thread priority
   int policy = 0;
@@ -106,6 +107,10 @@ bool setFiFoScheduling(pthread_t& thread, const int priority)
   else
   {
     ROS_INFO_STREAM("SCHED_FIFO OK, priority " << params.sched_priority);
+    if (params.sched_priority != priority)
+    {
+      return false;
+    }
   }
   return true;
 }
@@ -121,6 +126,7 @@ bool setCpuAffinity(pthread_t& thread, const int cpu_core)
     ROS_ERROR_STREAM("Error setting thread affinity to " << rc);
     return false;
   }
+  ROS_INFO_STREAM("Set cpu affinity to core " << cpu_core);
   return true;
 }
 
@@ -139,22 +145,36 @@ int main(int argc, char** argv)
 
   ur_driver::registerUrclLogHandler();
 
+  bool do_fifo_scheduling = nh_priv.param("do_fifo_scheduling", true);
+  int cpu_affinity = nh_priv.param("cpu_affinity", -1);
+  bool non_blocking_read = nh_priv.param("non_blocking_read", false);
+
   bool has_realtime = hasRealtimeKernel();
-  ROS_INFO_STREAM("This system has " << (has_realtime ? "a" : "no") << "real-time kernel");
+  ROS_INFO_STREAM("This system has " << (has_realtime ? "a" : "no") << " real-time kernel");
 
   pthread_t this_thread = pthread_self();
 
-  const int max_thread_priority = sched_get_priority_max(SCHED_FIFO);
-  if (max_thread_priority != -1)
+  if (do_fifo_scheduling)
   {
-    setFiFoScheduling(this_thread, max_thread_priority);
+    const int max_thread_priority = sched_get_priority_max(SCHED_FIFO);
+    ROS_INFO_STREAM("Max thread scheduling priority is " << max_thread_priority);
+    if (max_thread_priority != -1)
+    {
+      setFiFoScheduling(this_thread, max_thread_priority);
+    }
+    else
+    {
+      ROS_ERROR("Could not get maximum thread priority for main thread");
+    }
   }
-  else
-  {
-    ROS_ERROR("Could not get maximum thread priority for main thread");
+  else {
+    ROS_INFO("No FIFO scheduling requested");
   }
 
-  setCpuAffinity(this_thread, 1);
+  if (cpu_affinity > 0)
+  {
+    setCpuAffinity(this_thread, cpu_affinity);
+  }
 
   // Set up timers
   ros::Time timestamp;
@@ -200,6 +220,15 @@ int main(int argc, char** argv)
 
     g_hw_interface->write(timestamp, period);
     timings[cycles_done] = period;
+    auto diff = expected_cycle_time - period.toSec();
+    if (non_blocking_read)
+    {
+      //std::cout << "period: " << period << std::endl;
+      std::chrono::duration sleep_period = std::chrono::duration<double, std::ratio<1>>(diff);
+      //std::cout << "sleeping for " << sleep_period.count() << " seconds." << std::endl;
+      std::this_thread::sleep_for(sleep_period);
+    }
+;
     cycles_done++;
   }
 
